@@ -1,118 +1,65 @@
-import pyromod.listen
-import sys
+from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from pyrogram import Client, enums
+from config import BOT_TOKEN, CHANNEL_1, CHANNEL_2, GROUP
 
-from config import (
-    API_HASH,
-    APP_ID,
-    CHANNEL_ID,
-    FORCE_SUB_CHANNEL,
-    FORCE_SUB_GROUP,
-    LOGGER,
-    OWNER,
-    TG_BOT_TOKEN,
-    TG_BOT_WORKERS,
-)
+app = Client("fshub", bot_token=BOT_TOKEN)
 
 
-class Bot(Client):
-    def __init__(self):
-        super().__init__(
-            name="FshubBot",
-            api_hash=API_HASH,
-            api_id=APP_ID,
-            plugins={"root": "plugins"},
-            workers=TG_BOT_WORKERS,
-            bot_token=TG_BOT_TOKEN,
+# 🔍 CEK JOIN SEMUA
+async def is_joined_all(client, user_id):
+    try:
+        ch1 = await client.get_chat_member(CHANNEL_1, user_id)
+        ch2 = await client.get_chat_member(CHANNEL_2, user_id)
+        grp = await client.get_chat_member(GROUP, user_id)
+
+        return (
+            ch1.status in ["member", "administrator", "creator"]
+            and ch2.status in ["member", "administrator", "creator"]
+            and grp.status in ["member", "administrator", "creator"]
         )
-        self.LOGGER = LOGGER
+    except:
+        return False
 
-    async def start(self):
-        try:
-            await super().start()
-            me = await self.get_me()
-            self.username = me.username
-            self.namebot = me.first_name
 
-            self.LOGGER(__name__).info(
-                f"✅ BOT AKTIF\nNama: {self.namebot}\nUsername: @{self.username}"
-            )
+# 🚀 START
+@app.on_message(filters.command("start"))
+async def start(client, message):
+    user_id = message.from_user.id
 
-        except Exception as e:
-            self.LOGGER(__name__).error(f"❌ Gagal start bot: {e}")
-            sys.exit()
+    joined = await is_joined_all(client, user_id)
 
-        # 🔒 FORCE SUB CHANNEL
-        if FORCE_SUB_CHANNEL:
-            try:
-                info = await self.get_chat(FORCE_SUB_CHANNEL)
-                link = info.invite_link
+    if not joined:
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📢 Channel 1", url=f"https://t.me/{CHANNEL_1.replace('@','')}")],
+            [InlineKeyboardButton("📢 Channel 2", url=f"https://t.me/{CHANNEL_2.replace('@','')}")],
+            [InlineKeyboardButton("👥 Join Group", url=f"https://t.me/{GROUP.replace('@','')}")],
+            [InlineKeyboardButton("✅ Coba Lagi", callback_data="check_join")]
+        ])
 
-                if not link:
-                    link = await self.export_chat_invite_link(FORCE_SUB_CHANNEL)
-
-                self.invitelink = link
-
-                self.LOGGER(__name__).info(
-                    f"📢 Force Sub Channel: {info.title} ({info.id})"
-                )
-
-            except Exception as e:
-                self.LOGGER(__name__).error(
-                    f"❌ Gagal akses FORCE_SUB_CHANNEL: {e}"
-                )
-                sys.exit()
-
-        # 🔒 FORCE SUB GROUP
-        if FORCE_SUB_GROUP:
-            try:
-                info = await self.get_chat(FORCE_SUB_GROUP)
-                link = info.invite_link
-
-                if not link:
-                    link = await self.export_chat_invite_link(FORCE_SUB_GROUP)
-
-                self.invitelink2 = link
-
-                self.LOGGER(__name__).info(
-                    f"👥 Force Sub Group: {info.title} ({info.id})"
-                )
-
-            except Exception as e:
-                self.LOGGER(__name__).error(
-                    f"❌ Gagal akses FORCE_SUB_GROUP: {e}"
-                )
-                sys.exit()
-
-        # 📦 DATABASE CHANNEL
-        try:
-            db_channel = await self.get_chat(CHANNEL_ID)
-            self.db_channel = db_channel
-
-            test = await self.send_message(
-                chat_id=db_channel.id,
-                text="✅ Bot Connected",
-                disable_notification=True,
-            )
-            await test.delete()
-
-            self.LOGGER(__name__).info(
-                f"📁 Database Channel: {db_channel.title} ({db_channel.id})"
-            )
-
-        except Exception as e:
-            self.LOGGER(__name__).error(
-                f"❌ Gagal akses CHANNEL_ID: {e}"
-            )
-            sys.exit()
-
-        self.set_parse_mode(enums.ParseMode.HTML)
-
-        self.LOGGER(__name__).info(
-            f"🔥 BOT SIAP DIGUNAKAN 🔥\nOwner: @{OWNER}"
+        await message.reply_text(
+            "❌ Wajib join semua dulu bro!\nKlik tombol bawah 👇",
+            reply_markup=keyboard
+        )
+    else:
+        await message.reply_text(
+            "🔥 Mantap! Lu udah join semua\nAkses file kebuka 🚀"
         )
 
-    async def stop(self, *args):
-        await super().stop()
-        self.LOGGER(__name__).info("🛑 Bot stopped.")
+
+# 🔁 CEK ULANG
+@app.on_callback_query(filters.regex("check_join"))
+async def check_join(client, callback_query):
+    user_id = callback_query.from_user.id
+
+    joined = await is_joined_all(client, user_id)
+
+    if joined:
+        await callback_query.message.edit_text(
+            "🔥 Verified! Lu udah join semua 🚀"
+        )
+    else:
+        await callback_query.answer("❌ Masih ada yang belum lu join!", show_alert=True)
+
+
+app.run()
