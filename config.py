@@ -6,4 +6,5 @@ API_HASH = "131c3a26243bbd2e6c67fac16df78a72"
 CHANNEL_1 = "@slengean22"
 CHANNEL_2 = "@bringas22"
 GROUP = "@sloter_gacor_indonesia"
+
 ADMINS = [1864465487]
